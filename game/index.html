@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>SNOW RUSH · Q版雪地跑酷</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<style>
+  :root {
+    --candy: #ff7a70; --candy-deep: #ef5a52; --mint: #58cfb8; --sun: #ffc94d;
+    --ink: #40536e; --card: rgba(255, 255, 255, 0.88);
+    --shadow: 0 12px 32px rgba(64, 108, 168, 0.30);
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe6f8;
+    font-family: "Segoe UI Rounded", "Baloo 2", "Comic Sans MS", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    color: var(--ink); user-select: none; -webkit-tap-highlight-color: transparent; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: radial-gradient(ellipse at 50% 42%, transparent 62%, rgba(90, 130, 180, 0.16) 100%); }
+  #flash { position: fixed; inset: 0; pointer-events: none; z-index: 8; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 34%, rgba(255, 92, 82, 0.45) 100%); }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+  .panel {
+    position: absolute; padding: 14px 22px 16px; background: var(--card);
+    border-radius: 26px; box-shadow: var(--shadow);
+    backdrop-filter: blur(6px); border: 3px solid rgba(255, 255, 255, 0.75);
+  }
+  .tag { font-size: 12px; letter-spacing: .22em; font-weight: 700; opacity: 0.55; }
+  .num { font-variant-numeric: tabular-nums; font-weight: 800; }
+
+  #speedPanel { left: 22px; bottom: 22px; min-width: 218px; }
+  #speedVal { font-size: 54px; line-height: 1; color: var(--candy-deep); margin-top: 4px; }
+  #speedVal small { font-size: 15px; letter-spacing: .16em; opacity: 0.75; color: var(--ink); margin-left: 4px; }
+  #speedTrack { margin-top: 10px; height: 12px; border-radius: 999px; overflow: hidden;
+    background: rgba(64, 83, 110, 0.14); }
+  #speedBar { height: 100%; width: 0%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--mint), var(--sun), var(--candy)); }
+
+  #scorePanel { right: 22px; top: 22px; text-align: right; min-width: 200px; }
+  #scoreVal { font-size: 34px; color: var(--candy-deep); line-height: 1.15; }
+  #scoreVal small { display: block; font-size: 12px; letter-spacing: .08em; opacity: 0.72; color: var(--ink); margin-top: 4px; }
+  .dots { margin-top: 10px; height: 10px; opacity: 0.7; border-radius: 999px;
+    background: radial-gradient(circle 4px at 5px 5px, var(--mint) 95%, transparent) 0 0 / 14px 10px repeat-x; }
+
+  /* 任务面板 */
+  #missionPanel { left: 22px; top: 86px; min-width: 236px; padding: 12px 18px 14px; }
+  #missionText { font-size: 13px; font-weight: 700; margin-top: 5px; }
+  #missionTrack { margin-top: 9px; height: 8px; border-radius: 999px; overflow: hidden;
+    background: rgba(64, 83, 110, 0.14); }
+  #missionBar { height: 100%; width: 0%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--sun), var(--candy)); }
+
+  /* 汽车上方道具倒计时气泡 */
+  #carStatus { position: fixed; z-index: 12; display: none; gap: 8px;
+    transform: translate(-50%, -100%); pointer-events: none; }
+  .bpill { padding: 6px 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.92);
+    border: 2px solid #fff; font-size: 15px; font-weight: 800; white-space: nowrap;
+    box-shadow: 0 8px 18px rgba(64, 108, 168, 0.28); font-variant-numeric: tabular-nums; }
+  .bpill.warn { background: #ffe0dc; border-color: var(--candy); color: var(--candy-deep);
+    animation: bpulse 0.5s ease-in-out infinite alternate; }
+  @keyframes bpulse { from { transform: scale(1); } to { transform: scale(1.12); } }
+
+  /* 新纪录徽章 */
+  #newBest { position: fixed; top: 86px; left: 50%; transform: translateX(-50%); z-index: 12;
+    display: none; padding: 10px 26px; border-radius: 999px; font-size: 15px; font-weight: 800;
+    letter-spacing: .12em; color: #fff;
+    background: linear-gradient(135deg, var(--sun), var(--candy));
+    box-shadow: 0 12px 28px rgba(255, 160, 60, 0.45); }
+
+  #combo { position: absolute; left: 50%; top: 62%; transform: translate(-50%, -50%) scale(.6);
+    opacity: 0; font-size: 44px; font-weight: 800; font-style: italic; color: var(--sun);
+    -webkit-text-stroke: 2px #fff; text-shadow: 0 8px 22px rgba(255, 160, 60, 0.55); letter-spacing: .04em; }
+  #combo.pop { animation: comboPop .55s cubic-bezier(.2, 1.7, .4, 1) forwards; }
+  @keyframes comboPop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(.55); }
+    35% { opacity: 1; transform: translate(-50%, -50%) scale(1.14); }
+    100% { opacity: 0; transform: translate(-50%, -66%) scale(.92); }
+  }
+
+  #msg { left: 50%; top: 22px; transform: translateX(-50%); font-size: 16px; display: none;
+    text-align: center; white-space: nowrap; padding: 11px 30px; border-radius: 999px;
+    background: var(--card); box-shadow: var(--shadow); border: 3px solid rgba(255, 255, 255, 0.75);
+    line-height: 1.4; font-weight: 700; }
+  #msg b { display: inline; font-size: 19px; letter-spacing: .04em; margin-right: 10px;
+    background: linear-gradient(90deg, var(--candy), var(--sun), var(--mint));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  .hint { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+    padding: 10px 22px; border-radius: 999px; background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 8px 20px rgba(64, 108, 168, 0.22);
+    font-size: 12px; letter-spacing: .18em; opacity: 0.92; font-weight: 700; }
+
+  #muteBtn { position: fixed; left: 22px; top: 22px; z-index: 30; width: 50px; height: 50px;
+    border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.75); background: var(--card);
+    box-shadow: var(--shadow); font-size: 20px; cursor: pointer; }
+
+  /* 结算面板 */
+  #resultPanel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 25;
+    display: none; flex-direction: column; align-items: center; gap: 12px;
+    padding: 26px 40px 28px; min-width: 350px; max-height: 88vh; overflow-y: auto; pointer-events: auto;
+    background: var(--card); border-radius: 32px; box-shadow: var(--shadow);
+    border: 3px solid rgba(255, 255, 255, 0.75); backdrop-filter: blur(8px); }
+  #resultPanel h2 { margin: 0; font-size: 36px; letter-spacing: .05em;
+    background: linear-gradient(90deg, var(--candy), var(--sun));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .rgrid { display: grid; grid-template-columns: auto auto; gap: 7px 28px; font-size: 15px; font-weight: 700; }
+  .rgrid .k { opacity: 0.6; letter-spacing: .12em; }
+  .rgrid .v { text-align: right; font-variant-numeric: tabular-nums; color: var(--candy-deep); font-weight: 800; }
+  #againBtn { margin-top: 6px; padding: 13px 48px; font-size: 19px; font-weight: 800; letter-spacing: .18em;
+    color: #fff; background: linear-gradient(135deg, var(--candy), var(--candy-deep));
+    border: 0; border-radius: 999px; cursor: pointer; font-family: inherit;
+    box-shadow: 0 12px 28px rgba(239, 90, 82, 0.4); transition: transform .12s; }
+  #againBtn:active { transform: scale(0.94); }
+  .resultHint { font-size: 12px; letter-spacing: .22em; opacity: 0.55; font-weight: 700; }
+
+  /* 排行榜行 */
+  .boardWrap { width: 100%; margin-top: 4px; }
+  .boardTitle { font-size: 11px; letter-spacing: .24em; opacity: 0.5; font-weight: 700; margin-bottom: 6px; text-align: center; }
+  .brow { display: flex; align-items: center; gap: 10px; padding: 5px 12px; border-radius: 12px;
+    font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .brow:nth-child(odd) { background: rgba(64, 83, 110, 0.06); }
+  .brow.hl { background: linear-gradient(90deg, rgba(255, 201, 77, 0.45), rgba(255, 122, 112, 0.3));
+    outline: 2px solid var(--sun); }
+  .brow.empty { justify-content: center; opacity: 0.55; font-weight: 600; }
+  .bno { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 11px; opacity: 0.75; }
+  .brow.hl .bno { background: var(--candy-deep); opacity: 1; }
+  .bsc { min-width: 62px; color: var(--candy-deep); font-weight: 800; }
+  .bdist { opacity: 0.6; font-size: 12px; }
+
+  /* 暂停遮罩 */
+  #pauseOverlay { position: fixed; inset: 0; z-index: 26; display: none; cursor: pointer;
+    align-items: center; justify-content: center; flex-direction: column; gap: 12px;
+    background: rgba(170, 210, 244, 0.72); backdrop-filter: blur(5px);
+    font-size: 32px; font-weight: 800; letter-spacing: .24em; color: var(--ink); }
+  #pauseOverlay .sub { font-size: 14px; opacity: 0.72; letter-spacing: .32em; }
+
+  /* 开始界面 */
+  #start { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 13px;
+    background: linear-gradient(180deg, rgba(170, 210, 244, 0.90), rgba(235, 245, 255, 0.94));
+    backdrop-filter: blur(6px); }
+  #start .title { font-size: 78px; font-weight: 800; line-height: 1.02; text-align: center;
+    letter-spacing: .05em; margin: 0;
+    background: linear-gradient(180deg, var(--candy) 20%, var(--sun) 90%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 12px 26px rgba(255, 122, 112, 0.35)); }
+  #start .sub { font-size: 17px; font-weight: 700; letter-spacing: .42em; opacity: 0.72; margin-right: -.42em; }
+  #start .best { font-size: 14px; font-weight: 700; opacity: 0.68;
+    padding: 7px 20px; border-radius: 999px; background: rgba(255, 255, 255, 0.7); }
+  #startBtn { margin-top: 6px; padding: 15px 58px; font-size: 23px; font-weight: 800; letter-spacing: .22em;
+    color: #fff; background: linear-gradient(135deg, var(--candy), var(--candy-deep));
+    border: 0; border-radius: 999px; cursor: pointer;
+    box-shadow: 0 16px 36px rgba(239, 90, 82, 0.45); transition: transform .12s; font-family: inherit; }
+  #startBtn:active { transform: scale(0.94); }
+  #start .hint { position: static; transform: none; margin-top: 2px; opacity: 0.8; }
+  .snowdeco { position: absolute; opacity: 0.55; color: #fff; text-shadow: 0 4px 14px rgba(90, 130, 180, 0.4); }
+
+  /* 选车 */
+  #carPicker { display: flex; gap: 12px; margin-top: 2px; }
+  .carCard { width: 108px; padding: 8px 8px 10px; border-radius: 20px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.72); border: 3px solid transparent;
+    box-shadow: 0 8px 20px rgba(64, 108, 168, 0.18); transition: transform .12s, border-color .12s; }
+  .carCard:active { transform: scale(0.95); }
+  .carCard.sel { border-color: var(--candy); background: #fff; transform: translateY(-4px);
+    box-shadow: 0 14px 28px rgba(255, 122, 112, 0.35); }
+  .carCard img { width: 100%; height: 62px; object-fit: cover; border-radius: 12px; display: block;
+    background: #dfeaf5; }
+  .carCard .cname { margin-top: 6px; text-align: center; font-size: 12px; font-weight: 800; letter-spacing: .1em; }
+  .carCard.sel .cname { color: var(--candy-deep); }
+
+  /* 战绩按钮 + 面板 */
+  #boardBtn { padding: 9px 26px; font-size: 14px; font-weight: 800; letter-spacing: .18em;
+    color: var(--ink); background: rgba(255, 255, 255, 0.8); border: 2px solid rgba(64, 83, 110, 0.15);
+    border-radius: 999px; cursor: pointer; font-family: inherit; }
+  #boardPanel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 28;
+    display: none; flex-direction: column; align-items: center; gap: 10px; pointer-events: auto;
+    padding: 24px 32px; min-width: 330px; max-height: 82vh; overflow-y: auto;
+    background: var(--card); border-radius: 28px; box-shadow: var(--shadow);
+    border: 3px solid rgba(255, 255, 255, 0.75); backdrop-filter: blur(8px); }
+  #boardPanel h3 { margin: 0; font-size: 22px; letter-spacing: .16em; }
+  #boardClose { align-self: flex-end; width: 32px; height: 32px; border-radius: 50%; border: 0;
+    background: rgba(64, 83, 110, 0.12); cursor: pointer; font-size: 14px; font-weight: 800; color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="vignette"></div>
+<div id="flash"></div>
+<button id="muteBtn" title="声音开关">🔊</button>
+<div id="hud">
+  <div class="panel" id="speedPanel">
+    <div class="tag">❄ 速度</div>
+    <div class="num" id="speedVal">0<small>km/h</small></div>
+    <div id="speedTrack"><div id="speedBar"></div></div>
+  </div>
+  <div class="panel" id="scorePanel">
+    <div class="tag">得分 · 里程</div>
+    <div class="num" id="scoreVal">0<small>里程 0.0 km</small></div>
+    <div class="dots"></div>
+  </div>
+  <div class="panel" id="missionPanel">
+    <div class="tag">★ 任务</div>
+    <div id="missionText">—</div>
+    <div id="missionTrack"><div id="missionBar"></div></div>
+  </div>
+  <div id="combo"></div>
+  <div class="panel" id="msg"></div>
+  <div class="hint">← → 换道 · 触屏滑动 · R 重来 · Esc 暂停</div>
+</div>
+<div id="carStatus"></div>
+<div id="newBest">🎉 新纪录！</div>
+<div id="resultPanel">
+  <h2 id="rTitle">撞车啦！</h2>
+  <div class="rgrid">
+    <div class="k">得分</div><div class="v" id="rScore">0</div>
+    <div class="k">最高分</div><div class="v" id="rBest">0</div>
+    <div class="k">本局排名</div><div class="v" id="rRank">—</div>
+    <div class="k">里程</div><div class="v" id="rDist">0 km</div>
+    <div class="k">金币</div><div class="v" id="rCoins">0</div>
+    <div class="k">最大连击</div><div class="v" id="rCombo">×0</div>
+    <div class="k">完成任务</div><div class="v" id="rMissions">0</div>
+    <div class="k">护盾抵挡</div><div class="v" id="rShield">0</div>
+  </div>
+  <div class="boardWrap">
+    <div class="boardTitle">🏆 TOP 5</div>
+    <div id="rBoard"></div>
+  </div>
+  <button id="againBtn">再来一局</button>
+  <div class="resultHint">按 R 也可以</div>
+</div>
+<div id="boardPanel">
+  <button id="boardClose">✕</button>
+  <h3>🏆 战绩排行</h3>
+  <div class="boardWrap"><div id="boardList"></div></div>
+</div>
+<div id="pauseOverlay">
+  <div>⏸ 已暂停</div>
+  <div class="sub">点击继续</div>
+</div>
+<div id="start">
+  <div class="snowdeco" style="left:14%;top:12%;font-size:40px">❄</div>
+  <div class="snowdeco" style="right:16%;top:18%;font-size:26px">❄</div>
+  <div class="snowdeco" style="left:24%;bottom:14%;font-size:30px">❄</div>
+  <div class="snowdeco" style="right:22%;bottom:22%;font-size:20px">❄</div>
+  <h1 class="title">SNOW RUSH</h1>
+  <div class="sub">Q版雪地跑酷</div>
+  <div class="best" id="bestLine">最高分 0</div>
+  <div id="carPicker">
+    <div class="carCard sel"><img src="./assets/pick_snowball.jpg" alt="雪球号"><div class="cname">🚗 雪球号</div></div>
+    <div class="carCard"><img src="./assets/pick_race.jpg" alt="极速号"><div class="cname">🏎️ 极速号</div></div>
+    <div class="carCard"><img src="./assets/pick_police.jpg" alt="巡逻号"><div class="cname">🚔 巡逻号</div></div>
+    <div class="carCard"><img src="./assets/pick_taxi.jpg" alt="的士号"><div class="cname">🚕 的士号</div></div>
+  </div>
+  <button id="startBtn">开始游戏</button>
+  <button id="boardBtn">🏆 战绩</button>
+  <div class="hint">← → 换道 · 触屏滑动 · R 重来 · Esc 暂停</div>
+</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://registry.npmmirror.com/three/0.169.0/files/build/three.module.js",
+    "three/addons/": "https://registry.npmmirror.com/three/0.169.0/files/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
